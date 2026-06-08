@@ -1,6 +1,7 @@
 use crate::AppState;
 use axum::{
     extract::{Json, Path, State},
+    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -9,7 +10,7 @@ use burncloud_service_token::{RouterToken, TokenService};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::response::{err, ok};
+use super::response::{err, err_status, ok};
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CreateTokenRequest {
@@ -75,11 +76,15 @@ async fn create_token(
     State(state): State<AppState>,
     Json(payload): Json<CreateTokenRequest>,
 ) -> impl IntoResponse {
-    tracing::info!(
-        "[API] create_token request: user_id={}, quota={:?}",
-        payload.user_id,
-        payload.quota_limit
-    );
+    // Validate inputs
+    if payload.user_id.trim().is_empty() {
+        return err_status("user_id is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if let Some(quota) = payload.quota_limit {
+        if quota < 0 {
+            return err_status("quota_limit must be >= 0", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+        }
+    }
 
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -146,11 +151,23 @@ async fn update_token(
     Path(token): Path<String>,
     Json(payload): Json<UpdateTokenRequest>,
 ) -> impl IntoResponse {
-    tracing::info!(
-        "[API] update_token request: {} -> {}",
-        token,
-        payload.status
-    );
+    // Validate status
+    let valid_statuses = ["active", "disabled"];
+    if !valid_statuses.contains(&payload.status.as_str()) {
+        return err_status(
+            format!("Invalid status: {}. Must be 'active' or 'disabled'", payload.status),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ).into_response();
+    }
+
+    // Check token exists
+    match TokenService::validate(&state.db, &token).await {
+        Ok(None) => return err("token not found").into_response(),
+        Err(e) => return err(e).into_response(),
+        Ok(Some(_)) => {}
+    }
+
+    tracing::info!("[API] update_token request: {} -> {}", token, payload.status);
     match TokenService::update_status(&state.db, &token, &payload.status).await {
         Ok(_) => {
             tracing::info!("[API] update_token success");
@@ -173,6 +190,14 @@ async fn delete_token(
     Path(token): Path<String>,
 ) -> impl IntoResponse {
     tracing::info!("[API] delete_token request: {}", token);
+
+    // Check token exists
+    match TokenService::validate(&state.db, &token).await {
+        Ok(None) => return err("token not found").into_response(),
+        Err(e) => return err(e).into_response(),
+        Ok(Some(_)) => {}
+    }
+
     match TokenService::delete(&state.db, &token).await {
         Ok(_) => {
             tracing::info!("[API] delete_token success");
