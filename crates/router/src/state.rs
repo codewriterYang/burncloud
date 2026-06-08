@@ -10,9 +10,10 @@ use crate::limiter::RateLimiter;
 use crate::model_router::ModelRouter;
 use crate::price_sync::SyncResult;
 use crate::rate_budget::InMemoryBudget;
+use crate::EmptyResponseCounter;
 use crate::scheduler::SchedulerPolicyMap;
 use burncloud_database::Database;
-use burncloud_database_router::RouterLog;
+use burncloud_database_router::{RouterLog, RouterRequestLog, StoragePolicy};
 use burncloud_service_billing::{CostCalculator, PriceCache};
 use reqwest::Client;
 use std::sync::atomic::AtomicU64;
@@ -36,6 +37,9 @@ pub struct AppState {
     pub limiter: Arc<RateLimiter>,
     pub circuit_breaker: Arc<CircuitBreaker>,
     pub log_tx: mpsc::Sender<RouterLog>,
+    /// Channel for async request log writes (router_request_logs table).
+    /// Capacity matches log_tx for consistent throughput.
+    pub request_log_tx: mpsc::Sender<RouterRequestLog>,
     pub model_router: Arc<ModelRouter>,
     pub channel_state_tracker: Arc<ChannelStateTracker>,
     pub adaptor_factory: Arc<adaptor::factory::DynamicAdaptorFactory>,
@@ -67,4 +71,9 @@ pub struct AppState {
     pub billing_post_settle_price_missing_count: Arc<AtomicU64>,
     /// AIMD → InMemoryBudget feedback channel (capacity=1, latest-wins debounce).
     pub budget_update_tx: mpsc::Sender<BudgetUpdate>,
+    /// Storage policy for request logs: full (complete bodies), summary (metadata only), none.
+    /// Default is summary for production; full for dev/debug.
+    pub request_log_storage_policy: StoragePolicy,
+    /// Counter for consecutive empty responses per channel (sliding window).
+    pub empty_response_counter: Arc<EmptyResponseCounter>,
 }
