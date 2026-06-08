@@ -17,7 +17,7 @@ pub fn LoginPage() -> Element {
     let state = ClientState::load();
     let last_username = state.last_username.unwrap_or_default();
 
-    let mut email = use_signal(move || last_username);
+    let mut username_or_email = use_signal(move || last_username);
     let mut pw = use_signal(String::new);
     let mut loading = use_signal(|| false);
     let mut login_error = use_signal(|| None::<String>);
@@ -26,7 +26,7 @@ pub fn LoginPage() -> Element {
     let auth = use_auth();
 
     let handle_login = move |_| {
-        let u = email.read().clone();
+        let u = username_or_email.read().clone();
         let p = pw.read().clone();
         if u.is_empty() || p.is_empty() {
             login_error.set(Some(
@@ -115,15 +115,15 @@ pub fn LoginPage() -> Element {
                 }
 
                 div { class: "flex flex-col gap-xl",
-                    // Email field
+                    // Username/Email field
                     div {
-                        label { class: "login-input-label", {t(*lang.read(), "login.form.email_label")} }
+                        label { class: "login-input-label", {t(*lang.read(), "login.form.username_label")} }
                         div { class: "login-input",
                             input {
-                                r#type: "email",
-                                placeholder: "you@burncloud.com",
-                                value: "{email}",
-                                oninput: move |e: Event<FormData>| email.set(e.value()),
+                                r#type: "text",
+                                placeholder: "username 或 you@burncloud.com",
+                                value: "{username_or_email}",
+                                oninput: move |e: Event<FormData>| username_or_email.set(e.value()),
                             }
                         }
                     }

@@ -664,6 +664,8 @@ pub fn t(lang: Language, key: &'static str) -> &'static str {
         (Language::En, "login.form.subtitle") => "Log in to your gateway console",
         (Language::Zh, "login.form.email_label") => "邮箱地址",
         (Language::En, "login.form.email_label") => "Email Address",
+        (Language::Zh, "login.form.username_label") => "用户名 / 邮箱",
+        (Language::En, "login.form.username_label") => "Username / Email",
         (Language::Zh, "login.form.password_label") => "密码",
         (Language::En, "login.form.password_label") => "Password",
         (Language::Zh, "login.form.forgot_password") => "忘记密码?",
