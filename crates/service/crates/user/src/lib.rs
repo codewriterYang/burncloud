@@ -189,6 +189,17 @@ impl UserService {
             return Err(UserServiceError::UserAlreadyExists);
         }
 
+        // Check email uniqueness if provided (prevents account confusion in try_login)
+        if let Some(ref email_str) = email {
+            if let Ok(Some(existing)) = UserDatabase::get_user_by_email(db, email_str).await {
+                tracing::warn!(
+                    "Registration rejected: email '{}' already used by user '{}'",
+                    email_str, existing.username
+                );
+                return Err(UserServiceError::UserAlreadyExists);
+            }
+        }
+
         // Hash the password
         let password_hash =
             hash(password, DEFAULT_COST).map_err(|e| UserServiceError::HashError(e.to_string()))?;
