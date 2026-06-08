@@ -1,4 +1,4 @@
-use crate::api::response::{err, ok};
+use crate::api::response::{err, err_status, ok};
 use crate::AppState;
 use axum::{
     body::Body,
@@ -101,6 +101,14 @@ async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<RegisterDto>,
 ) -> impl IntoResponse {
+    // Validate password strength
+    if payload.password.is_empty() {
+        return err_status("Password is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.password.len() < 8 {
+        return err_status("Password must be at least 8 characters", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+
     match state
         .user_service
         .register_user(
@@ -134,7 +142,9 @@ async fn create_user(
                 }
             }
         }
-        Err(UserServiceError::UserAlreadyExists) => err("Username already exists").into_response(),
+        Err(UserServiceError::UserAlreadyExists) => {
+            err_status("Username already exists", StatusCode::CONFLICT).into_response()
+        }
         Err(e) => {
             tracing::error!("Registration error: {}", e);
             err("Registration failed").into_response()
@@ -144,6 +154,14 @@ async fn create_user(
 
 #[tracing::instrument(skip(state, payload), fields(username = %payload.username))]
 async fn login(State(state): State<AppState>, Json(payload): Json<LoginDto>) -> impl IntoResponse {
+    // Validate non-empty fields
+    if payload.username.trim().is_empty() {
+        return err_status("Username is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.password.is_empty() {
+        return err_status("Password is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+
     match state
         .user_service
         .try_login(&state.db, &payload.username, &payload.password)
@@ -164,8 +182,12 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginDto>) -> 
             })
             .into_response()
         }
-        Err(UserServiceError::UserNotFound) => err("User not found").into_response(),
-        Err(UserServiceError::InvalidCredentials) => err("Invalid credentials").into_response(),
+        Err(UserServiceError::UserNotFound) => {
+            err_status("Invalid credentials", StatusCode::UNAUTHORIZED).into_response()
+        }
+        Err(UserServiceError::InvalidCredentials) => {
+            err_status("Invalid credentials", StatusCode::UNAUTHORIZED).into_response()
+        }
         Err(e) => {
             tracing::error!("Login error: {}", e);
             err("Login failed").into_response()
@@ -208,7 +230,7 @@ async fn reset_password(
     {
         Ok(()) => ok(serde_json::json!({ "message": "Password reset successful" })).into_response(),
         Err(UserServiceError::InvalidCredentials) => {
-            err("Invalid or expired reset token").into_response()
+            err_status("Invalid or expired reset token", StatusCode::BAD_REQUEST).into_response()
         }
         Err(e) => {
             tracing::error!("Reset password error: {}", e);

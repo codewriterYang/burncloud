@@ -1,8 +1,9 @@
 use crate::api::auth::Claims;
-use crate::api::response::{err, ok};
+use crate::api::response::{err, err_status, ok};
 use crate::AppState;
 use axum::{
     extract::{Extension, Json, Query, State},
+    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -95,6 +96,14 @@ async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterDto>,
 ) -> impl IntoResponse {
+    // Validate password strength
+    if payload.password.is_empty() {
+        return err_status("Password is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.password.len() < 8 {
+        return err_status("Password must be at least 8 characters", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+
     match state
         .user_service
         .register_user(
@@ -129,7 +138,9 @@ async fn register(
                 }
             }
         }
-        Err(UserServiceError::UserAlreadyExists) => err("用户名已存在").into_response(),
+        Err(UserServiceError::UserAlreadyExists) => {
+            err_status("用户名已存在", StatusCode::CONFLICT).into_response()
+        }
         Err(e) => err(e).into_response(),
     }
 }
@@ -155,6 +166,14 @@ async fn check_username(
 
 #[tracing::instrument(skip(state, payload), fields(username = %payload.username))]
 async fn login(State(state): State<AppState>, Json(payload): Json<LoginDto>) -> impl IntoResponse {
+    // Validate non-empty fields
+    if payload.username.trim().is_empty() {
+        return err_status("Username is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.password.is_empty() {
+        return err_status("Password is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+
     match state
         .user_service
         .try_login(&state.db, &payload.username, &payload.password)
@@ -178,8 +197,12 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginDto>) -> 
 
             ok(data).into_response()
         }
-        Err(UserServiceError::UserNotFound) => err("User not found").into_response(),
-        Err(UserServiceError::InvalidCredentials) => err("Invalid credentials").into_response(),
+        Err(UserServiceError::UserNotFound) => {
+            err_status("Invalid credentials", StatusCode::UNAUTHORIZED).into_response()
+        }
+        Err(UserServiceError::InvalidCredentials) => {
+            err_status("Invalid credentials", StatusCode::UNAUTHORIZED).into_response()
+        }
         Err(e) => err(e).into_response(),
     }
 }
