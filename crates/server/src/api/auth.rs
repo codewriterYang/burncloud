@@ -50,8 +50,7 @@ pub struct Claims {
 struct AuthData {
     id: String,
     username: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    roles: Option<Vec<String>>,
+    roles: Vec<String>,
     token: String,
 }
 
@@ -132,7 +131,7 @@ async fn create_user(
                 Ok(auth_token) => ok(AuthData {
                     id: user_id,
                     username: payload.username,
-                    roles: Some(roles),
+                    roles,
                     token: auth_token.token,
                 })
                 .into_response(),
@@ -177,7 +176,7 @@ async fn login(State(state): State<AppState>, Json(payload): Json<LoginDto>) -> 
             ok(AuthData {
                 id: auth_token.user_id,
                 username: auth_token.username,
-                roles: Some(roles),
+                roles,
                 token: auth_token.token,
             })
             .into_response()

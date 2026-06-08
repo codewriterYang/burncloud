@@ -36,7 +36,8 @@ impl ChannelService {
     }
 
     pub async fn list(page: usize, limit: usize) -> Result<Vec<Channel>, String> {
-        let url = format!("{}?page={}&limit={}", Self::get_base_url(), page, limit);
+        let offset = (page.saturating_sub(1)) * limit;
+        let url = format!("{}?offset={}&limit={}", Self::get_base_url(), offset, limit);
         let client = reqwest::Client::new();
         let resp = client.get(&url).send().await.map_err(|e| e.to_string())?;
 
@@ -46,8 +47,13 @@ impl ChannelService {
 
         let json: serde_json::Value = resp.json().await.map_err(|e| e.to_string())?;
 
+        // Backend returns {success: true, data: {channels: [...], pagination: {...}}}
         if let Some(data) = json.get("data") {
-            serde_json::from_value(data.clone()).map_err(|e| e.to_string())
+            if let Some(channels) = data.get("channels") {
+                serde_json::from_value(channels.clone()).map_err(|e| e.to_string())
+            } else {
+                Ok(vec![])
+            }
         } else {
             Ok(vec![])
         }

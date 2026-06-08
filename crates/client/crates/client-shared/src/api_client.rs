@@ -206,7 +206,7 @@ impl ApiClient {
     // --- Channel Operations ---
 
     pub async fn list_channels(&self) -> Result<Vec<ChannelDto>> {
-        let url = format!("{}/channels", self.base_url);
+        let url = format!("{}/console/api/channel", self.base_url);
         let resp = self.with_auth(self.client.get(&url)).send().await?;
 
         if !resp.status().is_success() {
@@ -221,7 +221,7 @@ impl ApiClient {
     }
 
     pub async fn create_channel(&self, channel: ChannelDto) -> Result<()> {
-        let url = format!("{}/channels", self.base_url);
+        let url = format!("{}/console/api/channel", self.base_url);
         let resp = self.with_auth(self.client.post(&url).json(&channel)).send().await?;
 
         if !resp.status().is_success() {
@@ -234,7 +234,7 @@ impl ApiClient {
     }
 
     pub async fn delete_channel(&self, id: &str) -> Result<()> {
-        let url = format!("{}/channels/{}", self.base_url, id);
+        let url = format!("{}/console/api/channel/{}", self.base_url, id);
         let resp = self.with_auth(self.client.delete(&url)).send().await?;
 
         if !resp.status().is_success() {
@@ -249,7 +249,7 @@ impl ApiClient {
     // --- Token Operations ---
 
     pub async fn list_tokens(&self) -> Result<Vec<TokenDto>> {
-        let url = format!("{}/api/tokens", self.base_url);
+        let url = format!("{}/console/api/tokens", self.base_url);
         let resp = self.with_auth(self.client.get(&url)).send().await?;
 
         if !resp.status().is_success() {
@@ -259,7 +259,7 @@ impl ApiClient {
     }
 
     pub async fn create_token(&self, user_id: &str, quota_limit: Option<i64>) -> Result<String> {
-        let url = format!("{}/api/tokens", self.base_url);
+        let url = format!("{}/console/api/tokens", self.base_url);
         let body = serde_json::json!({
             "user_id": user_id,
             "quota_limit": quota_limit
@@ -280,7 +280,7 @@ impl ApiClient {
     }
 
     pub async fn delete_token(&self, token: &str) -> Result<()> {
-        let url = format!("{}/api/tokens/{}", self.base_url, token);
+        let url = format!("{}/console/api/tokens/{}", self.base_url, token);
         let resp = self.with_auth(self.client.delete(&url)).send().await?;
 
         if !resp.status().is_success() {
@@ -290,7 +290,7 @@ impl ApiClient {
     }
 
     pub async fn update_token_status(&self, token: &str, status: &str) -> Result<()> {
-        let url = format!("{}/api/tokens/{}", self.base_url, token);
+        let url = format!("{}/console/api/tokens/{}", self.base_url, token);
         let body = serde_json::json!({
             "status": status
         });
@@ -427,7 +427,7 @@ impl ApiClient {
 
     pub async fn check_username_availability(&self, username: &str) -> Result<bool, String> {
         let url = format!(
-            "{}/api/user/check_username?username={}",
+            "{}/console/api/user/check_username?username={}",
             self.base_url, username
         );
 
