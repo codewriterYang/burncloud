@@ -100,7 +100,10 @@ async fn create_user(
     State(state): State<AppState>,
     Json(payload): Json<RegisterDto>,
 ) -> impl IntoResponse {
-    // Validate password strength
+    // Validate inputs
+    if payload.username.trim().is_empty() {
+        return err_status("Username is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
     if payload.password.is_empty() {
         return err_status("Password is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
     }

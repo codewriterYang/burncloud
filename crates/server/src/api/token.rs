@@ -282,12 +282,32 @@ async fn set_ip_whitelist(
     Path(token): Path<String>,
     Json(payload): Json<SetIpWhitelistRequest>,
 ) -> impl IntoResponse {
-    tracing::info!(
-        "[API] set_ip_whitelist request: token={}, whitelist={}",
-        token,
-        payload.ip_whitelist
-    );
+    // Validate IP whitelist format (comma-separated IPs/CIDRs)
+    let trimmed = payload.ip_whitelist.trim();
+    if !trimmed.is_empty() {
+        for entry in trimmed.split(',') {
+            let entry = entry.trim();
+            if entry.is_empty() {
+                return err_status("Invalid IP whitelist: empty entry", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+            }
+            // Basic format check: IP or CIDR
+            if !entry.contains('.') && !entry.contains(':') {
+                return err_status(
+                    format!("Invalid IP whitelist entry: '{}'", entry),
+                    StatusCode::UNPROCESSABLE_ENTITY,
+                ).into_response();
+            }
+        }
+    }
 
+    // Check token exists
+    match TokenService::validate(&state.db, &token).await {
+        Ok(None) => return err("token not found").into_response(),
+        Err(e) => return err(e).into_response(),
+        Ok(Some(_)) => {}
+    }
+
+    tracing::info!("[API] set_ip_whitelist request: token={}", token);
     match TokenService::set_ip_whitelist(&state.db, &token, &payload.ip_whitelist).await {
         Ok(true) => {
             tracing::info!("[API] set_ip_whitelist success");

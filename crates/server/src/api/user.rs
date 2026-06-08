@@ -80,7 +80,18 @@ pub fn routes() -> Router<AppState> {
 
 #[tracing::instrument(skip(state, payload), fields(user_id = %payload.user_id))]
 async fn topup(State(state): State<AppState>, Json(payload): Json<TopupDto>) -> impl IntoResponse {
+    // Validate inputs
+    if payload.user_id.trim().is_empty() {
+        return err_status("user_id is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.amount <= 0 {
+        return err_status("amount must be positive", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
     let currency = payload.currency.unwrap_or_else(|| "USD".to_string());
+    if !["USD", "CNY"].contains(&currency.as_str()) {
+        return err_status("currency must be USD or CNY", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+
     match state
         .user_service
         .topup(&state.db, &payload.user_id, payload.amount, &currency)
@@ -96,7 +107,10 @@ async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterDto>,
 ) -> impl IntoResponse {
-    // Validate password strength
+    // Validate inputs
+    if payload.username.trim().is_empty() {
+        return err_status("Username is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
     if payload.password.is_empty() {
         return err_status("Password is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
     }
