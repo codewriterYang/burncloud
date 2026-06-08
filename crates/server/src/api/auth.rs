@@ -146,7 +146,7 @@ async fn create_user(
 async fn login(State(state): State<AppState>, Json(payload): Json<LoginDto>) -> impl IntoResponse {
     match state
         .user_service
-        .login_user(&state.db, &payload.username, &payload.password)
+        .try_login(&state.db, &payload.username, &payload.password)
         .await
     {
         Ok(auth_token) => {

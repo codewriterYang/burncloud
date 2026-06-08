@@ -274,6 +274,43 @@ impl UserService {
         self.generate_token(&user.id, &user.username)
     }
 
+    /// Try login by username_or_email (username first, then email fallback).
+    ///
+    /// This allows users to log in with either their username or email address.
+    pub async fn try_login(
+        &self,
+        db: &Database,
+        username_or_email: &str,
+        password: &str,
+    ) -> Result<AuthToken> {
+        // Try username first
+        match self.login_user(db, username_or_email, password).await {
+            Ok(token) => return Ok(token),
+            Err(UserServiceError::UserNotFound) => {
+                // Username not found — try email lookup
+            }
+            Err(other) => return Err(other),
+        }
+
+        // Fallback: look up user by email, then verify password
+        let user = UserDatabase::get_user_by_email(db, username_or_email)
+            .await?
+            .ok_or(UserServiceError::UserNotFound)?;
+
+        let password_hash = user
+            .password_hash
+            .ok_or(UserServiceError::InvalidCredentials)?;
+
+        let valid = verify(password, &password_hash)
+            .map_err(|e| UserServiceError::HashError(e.to_string()))?;
+
+        if !valid {
+            return Err(UserServiceError::InvalidCredentials);
+        }
+
+        self.generate_token(&user.id, &user.username)
+    }
+
     /// Generate JWT token for a user
     ///
     /// # Arguments
