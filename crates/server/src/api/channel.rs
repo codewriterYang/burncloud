@@ -1,8 +1,9 @@
 use crate::api::auth::Claims;
-use crate::api::response::{err, ok};
+use crate::api::response::{err, err_status, ok};
 use crate::AppState;
 use axum::{
     extract::{Path, Query, State},
+    http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
     Router,
@@ -168,6 +169,31 @@ async fn create_channel(
         return resp.into_response();
     }
 
+    // Validate required fields
+    if payload.name.trim().is_empty() {
+        return err_status("Channel name is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.key.trim().is_empty() {
+        return err_status("API key is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.models.trim().is_empty() {
+        return err_status("Models is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+    if payload.group.trim().is_empty() {
+        return err_status("Group is required", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+    }
+
+    // Validate base_url format if provided
+    if let Some(ref url_str) = payload.base_url {
+        let trimmed = url_str.trim();
+        if trimmed.is_empty() {
+            return err_status("base_url cannot be empty", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+        }
+        if let Err(_) = url::Url::parse(trimmed) {
+            return err_status("Invalid base_url format", StatusCode::UNPROCESSABLE_ENTITY).into_response();
+        }
+    }
+
     let mut channel = payload.into_channel();
     match ChannelService::create(&state.db, &mut channel).await {
         Ok(id) => ok(ChannelCreated { id }).into_response(),
@@ -203,6 +229,13 @@ async fn delete_channel(
 ) -> impl IntoResponse {
     if let Err(resp) = check_admin(&state, &claims).await {
         return resp.into_response();
+    }
+
+    // Check existence before attempting delete
+    match ChannelService::get_by_id(&state.db, id).await {
+        Ok(None) => return err("channel not found").into_response(),
+        Err(e) => return err(e).into_response(),
+        Ok(Some(_)) => {}
     }
 
     match ChannelService::delete(&state.db, id).await {

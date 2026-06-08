@@ -36,6 +36,7 @@ burncloud-service-channel = { workspace = true }
 burncloud-service-cache = { workspace = true }
 jsonwebtoken = { workspace = true }
 reqwest = { workspace = true, features = ["json"] }
+url = { workspace = true }
 chrono = { workspace = true }
 dirs = { workspace = true }
 
