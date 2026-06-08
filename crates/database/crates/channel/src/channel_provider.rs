@@ -301,9 +301,14 @@ impl ChannelProviderModel {
 
         // Insert abilities for model_mapping field (both keys and values)
         if let Some(model_mapping_str) = &channel.model_mapping {
-            if let Ok(mapping) =
-                serde_json::from_str::<std::collections::HashMap<String, String>>(model_mapping_str)
-            {
+            match serde_json::from_str::<std::collections::HashMap<String, String>>(model_mapping_str) {
+                Err(e) => {
+                    tracing::warn!(
+                        "model_mapping JSON parse failed for channel {}: {} — mapping ignored",
+                        channel.id, e
+                    );
+                }
+                Ok(mapping) => {
                 for (key, value) in &mapping {
                     // Normalize to lowercase
                     let key_lower = key.to_lowercase();
@@ -344,6 +349,7 @@ impl ChannelProviderModel {
                             .await?;
                     }
                 }
+            } // Ok(mapping)
             }
         }
 
